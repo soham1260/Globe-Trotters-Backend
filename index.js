@@ -54,6 +54,10 @@ const User = mongoose.model('User', userSchema);
 
 const JWT_SECRET = process.env.JWT;
 
+app.get('/checkserver',(req,res) => {
+    return res.status(200).send("server is running");
+})
+
 app.post('/signup', [
             body('name', 'name').isLength({ min: 3 }),
             body('email', 'email').isEmail(),
