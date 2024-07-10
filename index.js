@@ -23,7 +23,7 @@ cloudinary.config({
 });
 
 app.listen(process.env.PORT,() => {
-    console.log("Listening to port 5000");
+    console.log("Listening to port "+process.env.PORT);
     console.log("Logging on console "+new Date());
 })
 
@@ -450,6 +450,18 @@ app.get('/fetchallposts' ,fetchuser, async (req,res) => {
         const posts = await Post.find()
         res.json(posts);
     } 
+    catch (error) {
+        console.log(new Date().toLocaleString([], { hour12: false })+" : " +error.message);
+        res.status(500).send("Internal Server Error");
+    }
+})
+
+app.get('/search/:query' ,fetchuser, async (req,res) => {
+    try {
+        const query = req.params.query;
+        const posts = await Post.find({ $text: { $search: query } });
+        res.json(posts);
+    }
     catch (error) {
         console.log(new Date().toLocaleString([], { hour12: false })+" : " +error.message);
         res.status(500).send("Internal Server Error");
