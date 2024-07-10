@@ -467,3 +467,15 @@ app.get('/search/:query' ,fetchuser, async (req,res) => {
         res.status(500).send("Internal Server Error");
     }
 })
+
+app.get('/post/:id' , async (req,res) => {
+    try {
+        const id = req.params.id;
+        const post = await Post.find({ _id:id });
+        res.json(post);
+    }
+    catch (error) {
+        console.log(new Date().toLocaleString([], { hour12: false })+" : " +error.message);
+        res.status(500).send("Internal Server Error");
+    }
+})
