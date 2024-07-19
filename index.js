@@ -445,7 +445,7 @@ app.get('/fetchposts' ,fetchuser, async (req,res) => {
     }
 })
 
-app.get('/fetchallposts' ,fetchuser, async (req,res) => {
+app.get('/fetchallposts', async (req,res) => {
     try {
         const posts = await Post.find()
         res.json(posts);
@@ -456,7 +456,7 @@ app.get('/fetchallposts' ,fetchuser, async (req,res) => {
     }
 })
 
-app.get('/search/:query' ,fetchuser, async (req,res) => {
+app.get('/search/:query' , async (req,res) => {
     try {
         const query = req.params.query;
         const posts = await Post.find({ $text: { $search: query } });
@@ -477,5 +477,20 @@ app.get('/post/:id' , async (req,res) => {
     catch (error) {
         console.log(new Date().toLocaleString([], { hour12: false })+" : " +error.message);
         res.status(500).send("Internal Server Error");
+    }
+})
+
+app.get('/isloggedin' , async (req,res) => {
+    const token = req.header('auth-token');
+    if(!token){
+        res.status(401).send({error : "Invalid token"});
+    }
+
+    try {
+        const data = jwt.verify(token,JWT_SECRET);
+        res.status(200).send({message : "Valid user"})
+    } catch (error) {
+        console.log(new Date().toLocaleString([], { hour12: false })+" : JWT verification failed");
+        res.status(401).send({error : "Invalid token"});
     }
 })
