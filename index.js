@@ -16,6 +16,9 @@ const jwt = require('jsonwebtoken');
 
 const cloudinary = require('cloudinary').v2;
 
+const { GoogleGenAI } = require("@google/genai");
+const ai = new GoogleGenAI({ apiKey: process.env.AI });
+
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
@@ -492,5 +495,54 @@ app.get('/isloggedin' , async (req,res) => {
     } catch (error) {
         console.log(new Date().toLocaleString([], { hour12: false })+" : JWT verification failed");
         res.status(401).send({error : "Invalid token"});
+    }
+})
+
+app.post('/ai', [
+        body('prompt').notEmpty().withMessage('Prompt cannot be empty')
+    ],async(req,res) => {
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: [req.body.prompt],
+        });
+
+        res.status(200).send({ response: response.candidates[0].content.parts[0].text });
+    } catch (error) {
+        console.log(new Date().toLocaleString([], { hour12: false }) + " : " + error);
+        res.status(500).send({response:"Something's wrong on our side. Please try again."});
+    }
+})
+
+app.post('/ai_summarize/:id', [
+        body('prompt').notEmpty().withMessage('Prompt cannot be empty')
+    ],async(req,res) => {
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    
+    try {
+        const id = req.params.id;
+        const post = await Post.find({ _id:id });
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: "Title: "+post[0].title+".Blog: "+[post[0].content],
+            config: {
+                systemInstruction: "Answer the following question: " + req.body.prompt + ". Use the blog provided in markup language as the primary reference **if it contains relevant information**. If the blog does not sufficiently address the query, answer based on your own knowledge while maintaining accuracy and clarity."
+            },
+        });
+
+        res.status(200).send({ response: response.candidates[0].content.parts[0].text });
+    } catch (error) {
+        console.log(new Date().toLocaleString([], { hour12: false }) + " : " + error);
+        res.status(500).send({response:"Something's wrong on our side. Please try again."});
     }
 })
