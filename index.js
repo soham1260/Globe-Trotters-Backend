@@ -19,6 +19,65 @@ const cloudinary = require('cloudinary').v2;
 const { GoogleGenAI } = require("@google/genai");
 const ai = new GoogleGenAI({ apiKey: process.env.AI });
 
+const session = require("express-session");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+
+// Session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true
+}));
+
+// Initialize passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Configure passport to use Google OAuth
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "https://backend-oup3.onrender.com/auth/google/callback"
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+      let user = await User.findOne({ email: profile.emails[0].value }); //google sends an email check if that user exists
+
+      if (!user) {
+        // Create a new user
+        user = await User.create({
+          email: profile.emails[0].value,
+          name: profile.displayName,
+          googleId: profile.id,
+          password: "", // Leave blank if not used
+        });
+      }
+
+      // Build payload just like you do in /login
+      const data = {
+        user: {
+          id: user.id,
+        }
+      };
+
+      const authtoken = jwt.sign(data, JWT_SECRET);
+
+      user._jwt = authtoken; // attach JWT to user object
+      return done(null, user);
+
+    } catch (err) {
+      return done(err, null);
+    }
+}));
+
+// Serialize user
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
@@ -48,9 +107,10 @@ const postSchema = new mongoose.Schema({
 const Post = mongoose.model("Post",postSchema);
 
 const userSchema = new mongoose.Schema({
-    name: {type: String,required: true},
-    email:{type: String,required: true},
-    password : {type : String, required : true},
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String },
+    googleId: { type: String },
     posts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }]
 });
 const User = mongoose.model('User', userSchema);
@@ -546,3 +606,35 @@ app.post('/ai_summarize/:id', [
         res.status(500).send({response:"Something's wrong on our side. Please try again."});
     }
 })
+
+app.get("/auth/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
+app.get("/auth/google/callback",
+  passport.authenticate('google', { session: false, failureRedirect: '/' }),
+    (req, res) => {
+        // Send token to client same way as /login
+        const token = req.user._jwt;
+
+        // Redirect to React app with token in query param
+        res.redirect(`https://globe-trotters.onrender.com/oauth-success?token=${token}`);
+    }
+);
+
+app.get('/testing', (req, res) => {
+  const html = `
+    <html>
+      <head>
+        <title>Google OAuth Login</title>
+      </head>
+      <body>
+        <h1>Login with Google</h1>
+        <a href="/auth/google">
+          <button style="padding: 10px 20px; font-size: 16px;">Login with Google</button>
+        </a>
+      </body>
+    </html>
+  `;
+  res.send(html);
+});
